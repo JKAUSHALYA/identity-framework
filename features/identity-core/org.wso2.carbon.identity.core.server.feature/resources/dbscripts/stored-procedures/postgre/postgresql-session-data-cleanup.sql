@@ -59,7 +59,7 @@ BEGIN
 
     IF tracingenabled
     THEN
-      RAISE NOTICE 'TEMPORARY SESSION CLEANUP TASK SNAPSHOT TABLE CREATED...!!' || sessioncleanuptemptablecount;
+      RAISE NOTICE 'TEMPORARY SESSION CLEANUP TASK SNAPSHOT TABLE CREATED: %', sessioncleanuptemptablecount;
     END IF;
 
     sessioncleanupcount := 1;
@@ -77,7 +77,7 @@ BEGIN
 
       IF tracingenabled
       THEN
-        RAISE NOTICE 'DELETED SESSION COUNT...!!' || sessioncleanupcount;
+        RAISE NOTICE 'DELETED SESSION COUNT: %', sessioncleanupcount;
       END IF;
 
       DELETE FROM TMP_IDN_AUTH_SESSION_STORE
@@ -94,7 +94,7 @@ BEGIN
       IF tracingenabled
       THEN
         deletedsessions := deletedsessions + sessioncleanupcount;
-        RAISE NOTICE 'REMOVED SESSIONS: ' || deletedsessions || ' NO OF DELETED ENTRIES';
+        RAISE NOTICE 'REMOVED SESSIONS: % NO OF DELETED ENTRIES', deletedsessions;
       END IF;
 
       -- Sleep for some time letting other threads to run.
@@ -107,11 +107,8 @@ BEGIN
 
   IF tracingenabled
   THEN
-    RAISE NOTICE 'SESSION RECORDS REMOVED FROM IDN_AUTH_SESSION_STORE. ' || deletedsessions
-                 || 'TOTAL NO OF DELETED ENTRIES'
-                 || current_timestamp
-                 || 'COMPLETED_TIMESTAMP';
-
+    RAISE NOTICE 'SESSION RECORDS REMOVED FROM IDN_AUTH_SESSION_STORE: % COMPLETED_TIMESTAMP: %', deletedsessions,
+    current_timestamp;
     RAISE NOTICE 'SESSION_CLEANUP_TASK ENDED .... !';
   END IF;
 
@@ -121,7 +118,7 @@ BEGIN
 
   IF tracingenabled
   THEN
-    RAISE NOTICE 'OPERATION_CLEANUP_TASK STARTED .... !' || current_timestamp || 'STARTING TIMESTAMP';
+    RAISE NOTICE 'OPERATION_CLEANUP_TASK STARTED AT: %', current_timestamp;
   END IF;
 
   DROP TABLE TMP_IDN_AUTH_SESSION_STORE;
@@ -133,7 +130,7 @@ BEGIN
         SESSION_ID,
         SESSION_TYPE
       FROM IDN_AUTH_SESSION_STORE
-      WHERE OPERATION = "DELETE" AND TIME_CREATED < ||DATE_TO_UNIX_TS(operationCleanupTime) ||
+      WHERE OPERATION = "DELETE" AND TIME_CREATED < DATE_TO_UNIX_TS(operationCleanupTime) ||
             AND ROWNUM < chunkLimit;
     CREATE INDEX idn_auth_session_tmp_idx
       ON TMP_IDN_AUTH_SESSION_STORE (SESSION_ID);
@@ -143,7 +140,7 @@ BEGIN
 
     IF tracingenabled
     THEN
-      RAISE NOTICE 'TEMPORARY OPERATION CLEANUP SNAPSHOT TABLE CREATED...!!' || operationcleanuptemptablecount;
+      RAISE NOTICE 'TEMPORARY OPERATION CLEANUP SNAPSHOT TABLE CREATED %', operationcleanuptemptablecount;
     END IF;
 
     operationcleanupcount := 1;
@@ -156,30 +153,23 @@ BEGIN
         WHERE ROWNUM < batchSize;
 
       DELETE FROM idn_auth_session_store
-      WHERE SESSION_ID IN (SELECT SESSION_ID
-                           FROM idn_auth_session_store) AND SESSION_TYPE IN (SELECT SESSION_TYPE
-                                                                             FROM
-      );
+      WHERE SESSION_ID IN (SELECT SESSION_ID FROM idn_auth_session_store)
+            AND SESSION_TYPE IN (SELECT SESSION_TYPE FROM TMP_IDN_AUTH_SESSION_STORE) ;
 
       GET DIAGNOSTICS operationcleanupcount := ROW_COUNT;
 
       IF tracingenabled
       THEN
-        RAISE NOTICE 'DELETED STORE OPERATIONS COUNT...!! ' || operationcleanupcount;
+        RAISE NOTICE 'DELETED STORE OPERATIONS COUNT: %', operationcleanupcount;
       END IF;
 
       IF (tracingenabled)
       THEN
         deleteddeleteoperations := operationcleanupcount + deleteddeleteoperations;
-        RAISE NOTICE 'REMOVED DELETE OPERATION RECORDS: ' || deleteddeleteoperations;
+        RAISE NOTICE 'REMOVED DELETE OPERATION RECORDS: %', deleteddeleteoperations;
       END IF;
 
-      DELETE (
-      SELECT *
-      FROM
-        TMP_IDN_AUTH_SESSION_STORE a
-        INNER JOIN temp_session_batch b ON a.session_id = b.session_id
-      );
+      DELETE FROM TMP_IDN_AUTH_SESSION_STORE WHERE SESSION_ID IN (SELECT SESSION_ID FROM TEMP_SESSION_BATCH);
 
       IF tracingenabled
       THEN
@@ -189,7 +179,7 @@ BEGIN
       IF (tracingenabled)
       THEN
         deletedstoreoperations := operationcleanupcount + deletedstoreoperations;
-        RAISE NOTICE 'REMOVED STORE OPERATION RECORDS: ' || deletedstoreoperations;
+        RAISE NOTICE 'REMOVED STORE OPERATION RECORDS: %', deletedstoreoperations;
       END IF;
 
       DROP TABLE TEMP_SESSION_BATCH;
@@ -203,7 +193,7 @@ BEGIN
   IF (tracingenabled)
   THEN
     deletedstoreoperations := operationcleanupcount + deletedstoreoperations;
-    RAISE NOTICE 'DELETE OPERATION RECORDS REMOVED FROM IDN_AUTH_SESSION_STORE: ' || deleteddeleteoperations;
+    RAISE NOTICE 'DELETE OPERATION RECORDS REMOVED FROM IDN_AUTH_SESSION_STORE: %', deleteddeleteoperations;
     RAISE NOTICE 'FLAG SET TO INDICATE END OF CLEAN UP TASK...!!'')';
     RAISE NOTICE 'CLEANUP_SESSION_DATA() ENDED .... !'')';
   END IF;
